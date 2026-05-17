@@ -134,3 +134,58 @@ fn valid_authorization_handled_with_child_receipt_referencing_parent() {
         "receipt must expire later than it was issued"
     );
 }
+
+#[test]
+fn missing_policy_refs_is_refused_as_unsupported() {
+    let parent = load("missing_policy_refs.json");
+    let receipt = handle(&parent, &opts_supporting_change_policy());
+
+    assert_eq!(receipt.kind, Kind::HandlingReceipt);
+    assert_eq!(
+        receipt.admissibility.verdict,
+        Some(HandlingVerdict::Unsupported),
+        "empty policy_refs must fail closed as unsupported — a consumer cannot \
+         claim to understand a policy scheme that was never named",
+    );
+    assert_eq!(receipt.acted, Some(false), "missing policy ⇒ acted: false");
+
+    let parent_hash = artifact_hash(&parent);
+    assert_eq!(receipt.custody.causal_parents, vec![parent_hash]);
+
+    assert!(
+        receipt
+            .admissibility
+            .reason_codes
+            .iter()
+            .any(|c| c == "policy_refs_missing"),
+        "reason_codes must include 'policy_refs_missing': {:?}",
+        receipt.admissibility.reason_codes,
+    );
+}
+
+#[test]
+fn future_valid_from_is_refused_not_yet_valid() {
+    let parent = load("future_valid_from.json");
+    let receipt = handle(&parent, &opts_supporting_change_policy());
+
+    assert_eq!(receipt.kind, Kind::HandlingReceipt);
+    assert_eq!(
+        receipt.admissibility.verdict,
+        Some(HandlingVerdict::Refused),
+        "artifact whose valid_from is in the future has no current standing",
+    );
+    assert_eq!(receipt.acted, Some(false), "not-yet-valid ⇒ acted: false");
+
+    let parent_hash = artifact_hash(&parent);
+    assert_eq!(receipt.custody.causal_parents, vec![parent_hash]);
+
+    assert!(
+        receipt
+            .admissibility
+            .reason_codes
+            .iter()
+            .any(|c| c == "artifact_not_yet_valid"),
+        "reason_codes must include 'artifact_not_yet_valid': {:?}",
+        receipt.admissibility.reason_codes,
+    );
+}

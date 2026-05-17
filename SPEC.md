@@ -80,7 +80,7 @@ The act or assertion the artifact carries.
 - `subject` / `object`
 - `operation`
 - `target` or state delta, if applicable
-- opaque domain `payload` (treated as bytes by WLP)
+- opaque domain `payload` (opaque JSON after canonicalization)
 
 ### 6.2 `admissibility`
 

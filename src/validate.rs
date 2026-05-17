@@ -93,9 +93,10 @@ pub fn handle(parent: &Artifact, opts: &HandleOpts) -> Artifact {
 
 /// Decide the handling verdict in fail-closed priority order (SPEC §8).
 fn decide(parent: &Artifact, opts: &HandleOpts) -> (HandlingVerdict, Vec<String>, bool) {
-    // §8.3 — expiry check first. An expired authorization gets no further
-    // consideration; we do not look at its policy.
-    if opts.reference_time >= parent.temporal_envelope.valid_until {
+    let env = &parent.temporal_envelope;
+
+    // Expired wins first: a stale envelope gets no further consideration.
+    if opts.reference_time >= env.valid_until {
         return (
             HandlingVerdict::Expired,
             vec!["envelope_expired".to_string()],
@@ -103,7 +104,29 @@ fn decide(parent: &Artifact, opts: &HandleOpts) -> (HandlingVerdict, Vec<String>
         );
     }
 
-    // §8.5 — unsupported policy scheme must not silently downgrade to accept.
+    // Not-yet-valid: an artifact whose validity window is still in the future
+    // has no current standing. Use Refused (Expired is wrong-direction);
+    // explicit reason code carries the temporal semantics.
+    if opts.reference_time < env.valid_from {
+        return (
+            HandlingVerdict::Refused,
+            vec!["artifact_not_yet_valid".to_string()],
+            false,
+        );
+    }
+
+    // Missing policy basis: a consumer cannot claim to understand a policy
+    // scheme that was never named. Operationally unsupported, not malformed
+    // (the wire shape is fine; what's missing is the policy citation).
+    if parent.admissibility.policy_refs.is_empty() {
+        return (
+            HandlingVerdict::Unsupported,
+            vec!["policy_refs_missing".to_string()],
+            false,
+        );
+    }
+
+    // Unknown policy scheme must not silently downgrade to accept.
     let unsupported: Vec<String> = parent
         .admissibility
         .policy_refs
