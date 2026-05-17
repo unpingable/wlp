@@ -6,13 +6,15 @@
 //! have produced them.
 //!
 //! See `README.md` and `SPEC.md` at the repo root for the v0.1 constitution
-//! and acceptance criteria. v0.1 artifact classes:
-//!
-//! - `ClaimReceipt`
-//! - `AuthorizationReceipt`
-//! - `HandlingReceipt`
-//! - `RevocationReceipt`
-//! - `ContestReceipt`
-//!
-//! Constitution: every WLP artifact must carry the terms under which it
-//! stops binding. Missing or unparseable expiry fails closed.
+//! and acceptance criteria.
+
+pub mod canonical;
+pub mod model;
+pub mod validate;
+
+pub use canonical::artifact_hash;
+pub use model::{
+    Admissibility, Artifact, Contestability, Custody, HandlingVerdict, Kind, PolicyRef,
+    TemporalEnvelope, Transition,
+};
+pub use validate::{handle, HandleOpts};
