@@ -31,16 +31,56 @@ pub struct HandleOpts {
     pub supported_policy_schemes: Vec<String>,
 }
 
-/// Inspect `parent` and emit a HandlingReceipt that records what happened.
+/// Inspect `parent` in the presence of `context` and emit a HandlingReceipt
+/// that records what happened.
 ///
 /// `context` is the set of other WLP artifacts the consumer has admitted into
-/// scope (e.g., `RevocationReceipt`s that may target `parent`). v0.2 makes
-/// graph-awareness a wire contract: callers declare a context, even an empty
-/// one. The revocation-evaluation walk is wired in commit C; this signature
-/// change lands red.
-pub fn handle(parent: &Artifact, _context: &[&Artifact], opts: &HandleOpts) -> Artifact {
+/// scope. v0.2 considers `RevocationReceipt` entries whose `transition.target`
+/// equals `parent`'s `artifact_hash`; if the revocation is itself admissible
+/// (envelope valid, policy_refs non-empty, schemes supported), it mutates the
+/// parent's present standing to `revoked`.
+///
+/// A revocation does not erase historical validity (SPEC §8.8). If `parent`
+/// fails its own admissibility check, the receipt returns parent's own verdict;
+/// contextual revocations do not override it.
+pub fn handle(parent: &Artifact, context: &[&Artifact], opts: &HandleOpts) -> Artifact {
     let parent_hash = artifact_hash(parent);
-    let (verdict, reason_codes, acted) = decide(parent, opts);
+    let (mut verdict, mut reason_codes, mut acted) = decide(parent, opts);
+    let mut causal_parents = vec![parent_hash.clone()];
+
+    // §8.8: A's own failure is preserved; revocation never erases history.
+    // Only walk context when parent is otherwise accepted.
+    if matches!(verdict, HandlingVerdict::Accepted) {
+        let mut binding_revocations: Vec<String> = Vec::new();
+        for r in context {
+            if r.kind != Kind::RevocationReceipt {
+                continue;
+            }
+            let targets_parent = r
+                .transition
+                .as_ref()
+                .and_then(|t| t.target.as_deref())
+                .map(|t| t == parent_hash)
+                .unwrap_or(false);
+            if !targets_parent {
+                continue;
+            }
+            // §5.1 non-recursion: R's admissibility uses base artifact-level
+            // checks only. We do not search context for revocations of R.
+            let (r_verdict, _, _) = decide(r, opts);
+            if matches!(r_verdict, HandlingVerdict::Accepted) {
+                binding_revocations.push(artifact_hash(r));
+            }
+        }
+        if !binding_revocations.is_empty() {
+            // §5.1 deterministic causal_parents: lexicographic by hash.
+            binding_revocations.sort();
+            verdict = HandlingVerdict::Revoked;
+            reason_codes = vec!["authorization_revoked".to_string()];
+            acted = false;
+            causal_parents.extend(binding_revocations);
+        }
+    }
 
     let now = opts.reference_time;
     let mut receipt = Artifact {
@@ -60,7 +100,7 @@ pub fn handle(parent: &Artifact, _context: &[&Artifact], opts: &HandleOpts) -> A
             standing: None,
             scope: Some(parent.subject.clone()),
             basis: None,
-            evidence_refs: vec![parent_hash.clone()],
+            evidence_refs: vec![parent_hash],
             policy_refs: vec![],
             verdict: Some(verdict),
             reason_codes,
@@ -76,7 +116,7 @@ pub fn handle(parent: &Artifact, _context: &[&Artifact], opts: &HandleOpts) -> A
             issuer: opts.consumer.clone(),
             artifact_hash: None,
             signature: None,
-            causal_parents: vec![parent_hash],
+            causal_parents,
             receipt_hash: None,
         },
         contestability: Contestability {

@@ -48,7 +48,7 @@ linked back to its parent artifact by content hash.
 
 ## Status
 
-v0.1 names five artifact classes:
+v0.2 names five artifact classes:
 
 - `ClaimReceipt`
 - `AuthorizationReceipt`
@@ -56,14 +56,22 @@ v0.1 names five artifact classes:
 - `RevocationReceipt`
 - `ContestReceipt`
 
-Three behaviors are proven by fixture:
+`AuthorizationReceipt`, `HandlingReceipt`, and `RevocationReceipt` are
+load-bearing in v0.2. v0.2 adds revocation-aware handling: a consumer may
+consider a target artifact together with one or more `RevocationReceipt`s
+and must refuse action when the target's standing has been revoked.
+Inadmissible revocations must not bind, and revocation never erases the
+historical validity of an artifact that already failed its own check.
 
-1. Expired authorization is refused; a `HandlingReceipt` records the refusal.
-2. Unsupported policy reference is refused or degraded — never silently accepted.
-3. Valid authorization can be handled; a child `HandlingReceipt` references
-   the parent by content hash.
+The widened consumer API:
 
-See [`SPEC.md`](./SPEC.md).
+```
+fn handle(parent: &Artifact, context: &[&Artifact], opts: &HandleOpts) -> Artifact
+```
+
+Graph-awareness is wire contract, not opt-in: every consumer declares a
+context, even an empty one. See [`SPEC.md`](./SPEC.md) for the full grammar,
+fail-closed rules, and v0.1 + v0.2 acceptance criteria.
 
 ## License
 
