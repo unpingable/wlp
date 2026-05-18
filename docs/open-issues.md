@@ -46,3 +46,36 @@ the v0.1 coupling is acceptable.
 
 No redesign now. The separation should fall out of a forced fixture, not a
 speculative refactor.
+
+---
+
+## FUTURE: CLI is an executable spec witness, not an adoption surface
+
+**Status:** scope note, not an open issue. Recorded so future-me does not
+build the wrong shape under deadline pressure.
+
+WLP v0.2 ships library + fixtures only; no CLI. If a CLI ever lands, its
+role is bounded:
+
+> The CLI is an executable spec witness. The library is the contract.
+> The adopting tools own workflow, discovery, storage, and UX.
+
+A future CLI should:
+
+- parse artifacts
+- canonicalize
+- evaluate
+- print verdict / receipt output (optionally as JSON)
+- accept a target artifact and a directory or list of contextual receipts
+
+A future CLI must **not**:
+
+- discover artifacts on its own
+- act as a registry
+- author or evaluate policy
+- resolve context "helpfully" (no graph inference, no fetching, no caching)
+- become a daemon or indexer
+
+The adopters of WLP — Wicket, Governor, NQ, CI guards, validators, receipt
+stores, agents — own workflow, discovery, storage, and UX. A CLI that grows
+those responsibilities turns a tiny protocol into municipal bureaucracy.

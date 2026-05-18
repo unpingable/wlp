@@ -45,21 +45,60 @@ Any consumer that loses scope, evidence, custody, or temporal information
 while handling a WLP artifact must emit a HandlingReceipt that surfaces
 the loss as degradation or refusal — never as silent acceptance.
 
-## 5. Artifact classes (v0.1)
+## 5. Artifact classes
 
-| Class                  | Role                                                                |
-| ---------------------- | ------------------------------------------------------------------- |
-| `ClaimReceipt`         | A party asserts a statement about a subject.                        |
-| `AuthorizationReceipt` | An actor is authorized to perform an operation, under stated terms. |
-| `HandlingReceipt`      | A consumer records what it did (or refused) with a parent artifact. |
-| `RevocationReceipt`    | A previously-issued artifact no longer binds.                       |
-| `ContestReceipt`       | A previously-issued artifact is challenged on stated grounds.       |
+| Class                  | Role                                                                                            |
+| ---------------------- | ----------------------------------------------------------------------------------------------- |
+| `ClaimReceipt`         | A party asserts a statement about a subject.                                                    |
+| `AuthorizationReceipt` | An actor is authorized to perform an operation, under stated terms.                             |
+| `HandlingReceipt`      | A consumer records what it did (or refused) with a parent artifact.                             |
+| `RevocationReceipt`    | A previously-issued artifact's present standing is mutated; historical validity is unaffected.  |
+| `ContestReceipt`       | A previously-issued artifact is challenged on stated grounds.                                   |
 
-`AuthorizationReceipt` and `HandlingReceipt` are load-bearing in v0.1.
-`ClaimReceipt`, `RevocationReceipt`, and `ContestReceipt` are named so that
-the wire grammar reserves them and so revocation and contestability are not
-merely decorative fields. Their detailed semantics will be ratified by later
-fixtures.
+`AuthorizationReceipt`, `HandlingReceipt`, and `RevocationReceipt` are
+load-bearing in v0.2. `ClaimReceipt` and `ContestReceipt` remain named so
+that the wire grammar reserves them; their detailed semantics will be
+ratified by later fixtures.
+
+### 5.1 RevocationReceipt
+
+A `RevocationReceipt` mutates the **present standing** of a previously-issued
+artifact. It does **not** invalidate the historical artifact; it changes how
+a consumer must evaluate the targeted artifact going forward.
+
+**Invariant.** *RevocationReceipt does not invalidate the targeted artifact.
+It changes the targeted artifact's current standing. Historical validity is
+unaffected.*
+
+**Targeting.** `transition.target` carries the canonical hash of the revoked
+artifact, where:
+
+```
+parent_hash = sha256(canonical_json(parent_artifact))
+```
+
+This is the hash defined in §9 — the artifact-as-serialized hash. Not the
+receipt hash, not an evaluation-output hash, not any context-dependent hash.
+`transition.operation` should be `"revoke"`.
+
+**Admissibility of the revocation itself.** A `RevocationReceipt` is subject
+to the same admissibility checks as any other WLP artifact: temporal envelope
+must be valid (not expired, not future-dated); `policy_refs` must be
+non-empty and cite policy schemes the consumer supports. An inadmissible
+revocation does not bind, and produces no mutation of the targeted artifact's
+standing. "Fail-closed" for a revocation means *the revocation does not
+bind* — it does **not** mean "when in doubt, revoke."
+
+**Non-recursion.** In v0.2, revocations are not themselves subject to
+revocation. When the consumer evaluates a `RevocationReceipt` for its own
+admissibility, only the base artifact-level checks apply; the consumer does
+not search the context for revocations of the revocation.
+Revocation-of-revocation semantics are deferred to a later version.
+
+**Deterministic causal parents.** When more than one admissible revocation
+binds the same target, the emitted `HandlingReceipt` lists them in
+lexicographic order by `artifact_hash` within `causal_parents`, after the
+targeted artifact's hash.
 
 ## 6. Shared artifact grammar
 
@@ -160,6 +199,15 @@ A WLP validator must refuse or degrade — never silently accept — when:
    no action taken, no silent downgrade to `accepted`.
 6. Scope, evidence, or custody information is lost in handling ⇒ verdict
    `accepted_with_degradation` or `refused`, never `accepted`.
+7. An inadmissible `RevocationReceipt` — one that is expired, not-yet-valid,
+   policy-less, cites an unsupported policy scheme, or targets an artifact
+   other than the one being evaluated — MUST NOT mutate the standing of any
+   other artifact. Fail-closed in the revocation direction means *the
+   revocation does not bind*, not "when in doubt, revoke."
+8. An artifact whose own admissibility check fails returns its own verdict;
+   a contemporaneous `RevocationReceipt` does not override that verdict.
+   Revocation changes present standing; it does not erase historical
+   validity.
 
 ## 9. Canonicalization and custody hashes
 
@@ -217,3 +265,45 @@ v0.1 is accepted when three fixtures prove the loop:
    the parent `AuthorizationReceipt` by `artifact_hash`.
 
 Anything beyond these three behaviors is out of scope for v0.1.
+
+## 13. v0.2 acceptance
+
+v0.2 widens the consumer to be **graph-aware**: it can evaluate an artifact
+in the presence of contextual receipts that mutate its standing. Five
+fixture-driven tests prove the forcing case.
+
+The widened API:
+
+```
+fn handle(parent: &Artifact, context: &[&Artifact], opts: &HandleOpts) -> Artifact
+```
+
+Graph-awareness is wire contract, not opt-in: every consumer must declare a
+context (even an empty one).
+
+Required behaviors:
+
+1. **Valid R revokes A.** An admissible `AuthorizationReceipt` A together
+   with an admissible `RevocationReceipt` R whose
+   `transition.target == parent_hash(A)` yields verdict `revoked`,
+   `acted: false`, `causal_parents = [A_hash, R_hash]`.
+2. **Future-dated R does not bind.** A R with `valid_from > reference_time`
+   leaves A's verdict as `accepted`; R is not recorded in `causal_parents`.
+3. **R targeting a different hash does not affect A.** A R with
+   `transition.target` set to any hash other than `parent_hash(A)` leaves
+   A's verdict as `accepted`.
+4. **Policy-less R does not bind.** A R with empty `policy_refs` does not
+   mutate A's standing.
+5. **Revocation does not launder an already-invalid artifact.** An expired
+   `AuthorizationReceipt` together with an admissible `RevocationReceipt`
+   targeting it yields verdict `expired` (not `revoked`); only A's hash
+   appears in `causal_parents`. Revocation changes present standing; it
+   does not erase historical validity.
+
+The v0.1 fixtures continue to pass with the widened signature; existing
+consumers pass `&[]` for context.
+
+Anything beyond these five behaviors is out of scope for v0.2. In
+particular: no registry, no daemon, no discovery protocol, no global
+artifact graph, no key-management expansion, no policy DSL, no transitive
+revocation, no "revocation as event stream" shortcut, no CLI surface.
