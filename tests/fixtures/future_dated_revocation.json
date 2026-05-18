@@ -1,0 +1,48 @@
+{
+  "kind": "RevocationReceipt",
+  "version": "0.1",
+  "subject": "ticket-123",
+  "actor": "revoker-9",
+  "transition": {
+    "actor": "revoker-9",
+    "subject": "ticket-123",
+    "object": null,
+    "operation": "revoke",
+    "target": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "payload": null
+  },
+  "admissibility": {
+    "standing": "revoker",
+    "scope": "ticket-123",
+    "basis": "change-policy@v3 §7.1",
+    "evidence_refs": ["withdrawal-notice-q1"],
+    "policy_refs": [
+      { "scheme": "change-policy", "id": "v3", "version": "3" }
+    ],
+    "verdict": null,
+    "reason_codes": []
+  },
+  "temporal_envelope": {
+    "issued_at": "2026-05-17T08:00:00Z",
+    "valid_from": "2026-05-17T14:00:00Z",
+    "valid_until": "2026-05-17T22:00:00Z",
+    "revalidation_after": null,
+    "invalidation_conditions": null
+  },
+  "custody": {
+    "issuer": "system-a",
+    "artifact_hash": null,
+    "signature": null,
+    "causal_parents": [],
+    "receipt_hash": null
+  },
+  "contestability": {
+    "revocation_refs": [],
+    "revocation_endpoints": [],
+    "contest_refs": [],
+    "contest_endpoints": [],
+    "supersession_refs": [],
+    "degradation_behavior": null
+  },
+  "acted": null
+}

@@ -35,7 +35,7 @@ fn opts_supporting_change_policy() -> HandleOpts {
 #[test]
 fn expired_authorization_is_refused_with_handling_receipt() {
     let parent = load("expired_authorization.json");
-    let receipt = handle(&parent, &opts_supporting_change_policy());
+    let receipt = handle(&parent, &[], &opts_supporting_change_policy());
 
     assert_eq!(receipt.kind, Kind::HandlingReceipt);
     assert_eq!(
@@ -70,7 +70,7 @@ fn expired_authorization_is_refused_with_handling_receipt() {
 #[test]
 fn unsupported_policy_is_refused_not_silently_accepted() {
     let parent = load("unsupported_policy.json");
-    let receipt = handle(&parent, &opts_supporting_change_policy());
+    let receipt = handle(&parent, &[], &opts_supporting_change_policy());
 
     assert_eq!(receipt.kind, Kind::HandlingReceipt);
     assert_eq!(
@@ -97,7 +97,7 @@ fn unsupported_policy_is_refused_not_silently_accepted() {
 #[test]
 fn valid_authorization_handled_with_child_receipt_referencing_parent() {
     let parent = load("valid_authorization.json");
-    let receipt = handle(&parent, &opts_supporting_change_policy());
+    let receipt = handle(&parent, &[], &opts_supporting_change_policy());
 
     assert_eq!(receipt.kind, Kind::HandlingReceipt);
     assert_eq!(
@@ -138,7 +138,7 @@ fn valid_authorization_handled_with_child_receipt_referencing_parent() {
 #[test]
 fn missing_policy_refs_is_refused_as_unsupported() {
     let parent = load("missing_policy_refs.json");
-    let receipt = handle(&parent, &opts_supporting_change_policy());
+    let receipt = handle(&parent, &[], &opts_supporting_change_policy());
 
     assert_eq!(receipt.kind, Kind::HandlingReceipt);
     assert_eq!(
@@ -166,7 +166,7 @@ fn missing_policy_refs_is_refused_as_unsupported() {
 #[test]
 fn future_valid_from_is_refused_not_yet_valid() {
     let parent = load("future_valid_from.json");
-    let receipt = handle(&parent, &opts_supporting_change_policy());
+    let receipt = handle(&parent, &[], &opts_supporting_change_policy());
 
     assert_eq!(receipt.kind, Kind::HandlingReceipt);
     assert_eq!(

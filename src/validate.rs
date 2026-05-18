@@ -32,7 +32,13 @@ pub struct HandleOpts {
 }
 
 /// Inspect `parent` and emit a HandlingReceipt that records what happened.
-pub fn handle(parent: &Artifact, opts: &HandleOpts) -> Artifact {
+///
+/// `context` is the set of other WLP artifacts the consumer has admitted into
+/// scope (e.g., `RevocationReceipt`s that may target `parent`). v0.2 makes
+/// graph-awareness a wire contract: callers declare a context, even an empty
+/// one. The revocation-evaluation walk is wired in commit C; this signature
+/// change lands red.
+pub fn handle(parent: &Artifact, _context: &[&Artifact], opts: &HandleOpts) -> Artifact {
     let parent_hash = artifact_hash(parent);
     let (verdict, reason_codes, acted) = decide(parent, opts);
 
