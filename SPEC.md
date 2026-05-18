@@ -69,6 +69,11 @@ Every WLP artifact carries:
 - `version` — WLP wire version, e.g., `"0.1"`
 - `subject` — a domain-neutral identifier the artifact is about
 - `actor` — the party emitting the artifact
+- `acted` — for `HandlingReceipt` only: a consumer assertion of whether the
+  consumer acted on the parent artifact. `acted` is a consumer assertion in
+  the HandlingReceipt, not a conclusion produced by WLP validation. `null`
+  on every other artifact class. See [`docs/open-issues.md`](./docs/open-issues.md)
+  for the deferred validation/action separation.
 
 …and the following five sections:
 
