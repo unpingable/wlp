@@ -64,7 +64,7 @@ yet specify"). WLP's coverage:
 | # | Question                                                | WLP coverage                                                                                                                                                                                                              |
 |---|----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 1 | Wire format for `StandingRequest` / `StandingDecision`   | **Partial.** `AuthorizationReceipt` defines the emission shape — the artifact a `StandingDecision` serializes into. WLP does not define the resolver-interaction protocol itself; that is Standing-the-tool's territory. |
-| 2 | Cross-component receipt provenance format                | **Materially answered.** `custody.causal_parents` (refs by `artifact_hash`, SPEC §6.4) plus v0.2 graph-aware `handle(parent, context, opts)`. Chains of NQ → Wicket → Nightshift receipts are exactly the v0.2 shape.       |
+| 2 | Cross-component receipt provenance format                | **Materially answered.** `custody.causal_parents` (refs by `artifact_hash`, SPEC §6.4) plus v0.2 graph-aware `handle(parent, context, opts)`. The v0.2 shape carries each canonical chain on its own surface — NQ findings → Nightshift posture (the forward channel from the NQ ↔ NS channel split); policy → Wicket admissibility → action (the Wicket preflight chain) — without forcing distinct flows into one serial pipeline. |
 | 3 | Revocation propagation semantics                         | **Partial.** v0.2 `RevocationReceipt` defines artifact semantics: changes present standing, never erases historical validity, fail-closed in the revocation direction, non-recursive in v0.2. Runtime *propagation* — how downstream consumers that already admitted testimony find out and respond — is outside WLP's scope by design. |
 | 4 | Audit-aggregation surface                                | **Not answered, by design.** Per `docs/open-issues.md`: WLP punts workflow, discovery, storage, and UX to adopters.                                                                                                        |
 | 5 | Standing-tool config vocabulary                          | **Slot only.** `policy_refs` and standing class are open-ended slots; Standing-the-tool populates the vocabulary.                                                                                                          |
@@ -80,6 +80,11 @@ yet specify"). WLP's coverage:
   the terms under which it stops binding," not "WLP decides when the
   terms are met." That is a domain decision the standing-bearing
   component makes before emitting the artifact.
+- WLP may carry the receipt of an external reconciler, but WLP is not
+  the reconciler for self-subject findings. The cross-component pattern
+  (`~/git/cartography/coordination/SELF-SUBJECT-COLLAPSE.md`) names three
+  forcing instances (NS, NQ-on-NQ, agent_gov); WLP is not among them and
+  is not a candidate adjudicator for them.
 - WLP is not a per-component manifestation of the remote-standing
   boundary. The doctrine's per-component list (NQ, Nightshift, Wicket,
   Standing-the-tool, AG) is the row of components that decide things.
