@@ -198,6 +198,45 @@ This note does not authorize:
   `docs/open-issues.md`; if/when promotion happens, the open-issue
   entry is the authoritative repayment record, not this candidate.
 
+## Doctrinal articulation (promoted from this work)
+
+Two maxims surfaced while implementing the receiver-mediated seam
+in `examples/receiver_gate/`. They are stated here so siblings can
+cite them by name, not invented per-conversation.
+
+> **The witness packet travels. Its ontology does not get
+> jurisdiction.**
+>
+> Or: *receivers may admit WLP testimony; WLP may not pre-negotiate
+> its own admissibility.* At any evidence→policy seam, the
+> normalized boundary object lives on the receiver. Reject designs
+> where the producer's wire shape is the policy's input shape.
+> Tripwire-test for this: assert the policy never sees producer-
+> shaped fields (see `examples/receiver_gate/test_receiver_gate.py`'s
+> `test_policy_receives_normalized_admission_input_not_raw_packet`).
+
+> **Cooking is translation under receiver authority, not ontology
+> inheritance.**
+>
+> Nastier: *the adapter may translate testimony into policy
+> vocabulary; it may not let testimony choose the vocabulary.* The
+> destination layer's reserved names (e.g., Wicket's `prior_receipt`
+> = chained Wicket receipts, NOT "some receipt-shaped object from
+> the outside world") belong to the destination layer. The cook
+> table is where the receiver decides which destination-vocabulary
+> field carries the load of each source-vocabulary field. "But
+> they both call it X" is a near-miss to be vetted, not a free
+> conversion. Specimen incident: the first pass of
+> `WicketAdmissionPolicy._cook_intent` mapped the probe witness to
+> `prior_receipt` because both contain "receipt"; the fix names it
+> `command_output`, the cook table itself stands as `policy_ref`,
+> and Wicket authorizes honestly instead of accidentally.
+
+Both compose with this note: the first names the boundary the
+receiver-gate fixture exists to protect; the second names the
+discipline an admission engine must follow when it sits behind that
+boundary.
+
 ## Sibling references
 
 - `WLP_STANDING_BOUNDARY_CROSSREF.md` — WLP's position as wire-layer
@@ -207,7 +246,9 @@ This note does not authorize:
 - `~/git/wicket/WICKET_REMOTE_STANDING_ADAPTER_GAP.md` — wicket's
   parallel candidate note for the remote/assertion-standing
   vocabulary boundary. Same shape: name the slot early, gate the
-  build on real consumer pressure.
+  build on real consumer pressure. The cook-translation-authority
+  maxim above is the discipline its anticipated adapter plan
+  must follow.
 - `docs/open-issues.md` → `validation_result is not action_attestation`
   — the existing bounded-debt entry whose repayment trigger this
   promotion would satisfy.
