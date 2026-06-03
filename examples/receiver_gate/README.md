@@ -59,10 +59,11 @@ Key boundaries:
   placeholder (SPEC §6.4). HMAC is fixture-local, not the eventual
   WLP crypto.
 - A promotion of `ClaimReceipt` to load-bearing protocol status.
-- A Wicket integration. The receiver policy is a stub local dict:
-  "for `restart_service`, the required witness kind is
-  `failed_health_probe`, produced by `probe-service`." Wicket may
-  later replace the stub policy.
+- A live Wicket integration. The admission policy is a fixture-local
+  Wicket-shaped stand-in (`LocalAdmissionPolicy` in `admission.py`),
+  not a bridge to the real Wicket kernel. A real deployment would
+  back the same `AdmissionPolicy` protocol with a Wicket call (e.g.,
+  shell out to `wicket check` over a cooked Intent).
 - A normative envelope schema. The dicts here have WLP-flavored
   field names but do not conform to or extend `SPEC.md`.
 
@@ -73,7 +74,7 @@ cd examples/receiver_gate
 python3 -m pytest .
 ```
 
-Tests (one per lie-class case):
+Tests (one per lie-class case, plus the receiver-mediated boundary):
 
 - `admitted_restart_mutates_state`
 - `naked_claim_refused_no_mutation`
@@ -82,22 +83,52 @@ Tests (one per lie-class case):
 - `stale_witness_expired_no_mutation`
 - `producer_nonbinding_label_does_not_bypass_receiver_classification`
 - `prompt_injection_cannot_modify_policy`
+- `unknown_claim_type_unsupported_via_policy`
+- `wrong_witness_kind_refused_by_policy`
+- `policy_receives_normalized_admission_input_not_raw_packet`
+- `adapter_produces_admission_input_shape`
+- `admission_module_has_no_wlp_coupling`
 
-## Wicket integration, later
+## Wicket integration: the receiver-mediated seam
 
-When Wicket grows a callable admission-policy surface, replace the
-stub dict in `receiver_gate.py` with a Wicket call:
+This fixture demonstrates the **receiver-mediated** Wicket/WLP seam —
+the only shape integration may take.
 
 ```
-policy.accepts(
-    claim_type="restart_service",
-    witness_kind="failed_health_probe",
-    witness_anchor="probe-service",
-    target=...,
-    now=...,
-) -> accepted | refused | needs_evidence
+WLP packet (claim + witness)
+        │
+        ▼  receiver-side packet integrity:
+           producer, witness presence, anchor
+           authenticity (HMAC), claim/witness
+           target consistency, freshness
+        │
+        ▼  adapt_packet_to_admission_input(claim, witness, now)
+                 │
+                 ▼  AdmissionInput { claim_type, witness_kind,
+                                     witness_anchor, target, now }
+                       │
+                       ▼  policy.accepts(admission_input)
+                       │      → AdmissionVerdict
+                       │        (accepted | refused | unsupported)
+                       │
+        ▼  receiver acts on verdict (mutate iff accepted)
+        ▼  emit HandlingReceipt
 ```
 
-Until then, this example is WLP-side only: a Python fixture showing
-receiver-gated mutation over WLP-shaped receipts with a toy local
-policy seam.
+The forbidden shapes:
+
+- WLP calling Wicket directly. WLP emits packets; the receiver
+  couples to admission.
+- Wicket parsing raw WLP JSON. The policy receives `AdmissionInput`
+  only. The adapter is the boundary object — and the tests
+  `policy_receives_normalized_admission_input_not_raw_packet` and
+  `admission_module_has_no_wlp_coupling` enforce this in code.
+- WLP absorbing Wicket policy vocabulary (claim-type taxonomy stays
+  WLP-side; admissibility-policy vocabulary stays admission-side).
+
+The fixture's `LocalAdmissionPolicy` is a Wicket-shaped stand-in: it
+encodes the policy a real Wicket bridge would compute, but it is
+not the kernel. To swap in real Wicket, implement the
+`AdmissionPolicy` protocol by translating `AdmissionInput` into a
+cooked Wicket `Intent` and shelling out to `wicket check` (or an
+equivalent FFI). The receiver gate is unchanged by that swap.

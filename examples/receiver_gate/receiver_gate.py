@@ -8,6 +8,12 @@ import json
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
+from admission import (
+    AdmissionInput,
+    AdmissionPolicy,
+    LocalAdmissionPolicy,
+)
+
 
 Verdict = Literal["accepted", "refused", "expired", "unsupported"]
 
@@ -64,7 +70,8 @@ class HandlingReceipt:
 
 
 class ReceiverGate:
-    def __init__(self) -> None:
+    def __init__(self, policy: AdmissionPolicy | None = None) -> None:
+        self.policy: AdmissionPolicy = policy if policy is not None else LocalAdmissionPolicy()
         self.restart_count = 0
 
     def handle(
@@ -73,13 +80,12 @@ class ReceiverGate:
         witness_store: dict[str, dict[str, Any]],
         now: datetime,
     ) -> HandlingReceipt:
-        claim_type = claim.get("subject", {}).get("claim_type")
         target = claim.get("subject", {}).get("target")
 
-        # Receiver-owned classification. Producer labels are advisory only.
-        if claim_type != "restart_service":
-            return HandlingReceipt("unsupported", "unsupported claim type")
-
+        # Receiver-owned packet integrity: attribution, witness presence,
+        # anchor authenticity, claim/witness target consistency, freshness.
+        # Producer labels remain advisory only — classification is what the
+        # receiver will do with the message, not a wire field.
         if not claim.get("producer"):
             return HandlingReceipt("refused", "missing producer attribution")
 
@@ -91,17 +97,10 @@ class ReceiverGate:
         if witness is None:
             return HandlingReceipt("refused", "referenced witness not found")
 
-        if witness.get("producer") != TRUSTED_PROBE_ID:
-            return HandlingReceipt("refused", "witness producer is not trusted probe service")
-
         if not verify_probe_receipt(witness):
             return HandlingReceipt("refused", "witness failed trust-anchor verification")
 
-        subject = witness.get("subject", {})
-        if subject.get("kind") != "failed_health_probe":
-            return HandlingReceipt("refused", "wrong witness kind")
-
-        if subject.get("target") != target:
+        if witness.get("subject", {}).get("target") != target:
             return HandlingReceipt("refused", "witness target does not match claim target")
 
         observed_at_raw = witness.get("observed_at")
@@ -116,8 +115,44 @@ class ReceiverGate:
         if now - observed_at > MAX_WITNESS_AGE:
             return HandlingReceipt("expired", "witness expired")
 
-        self.restart_count += 1
-        return HandlingReceipt("accepted", "mutation admitted by receiver policy", mutated=True)
+        # Adapter: normalize verified packet facts into receiver-side
+        # admission input. The policy never sees raw WLP wire shape.
+        admission_input = adapt_packet_to_admission_input(claim, witness, now=now)
+        decision = self.policy.accepts(admission_input)
+
+        if decision.status == "accepted":
+            self.restart_count += 1
+            return HandlingReceipt("accepted", decision.reason, mutated=True)
+        if decision.status == "unsupported":
+            return HandlingReceipt("unsupported", decision.reason)
+        return HandlingReceipt("refused", decision.reason)
+
+
+def adapt_packet_to_admission_input(
+    claim: dict[str, Any],
+    witness: dict[str, Any] | None,
+    now: datetime,
+) -> AdmissionInput:
+    """Normalize verified packet facts into a receiver-side admission request.
+
+    This adapter is the boundary object. It reads WLP packet shape on the
+    way in and produces admission shape on the way out. The admission
+    policy MUST receive its inputs through this function (or one shaped
+    like it), never the raw packet.
+    """
+    subject = claim.get("subject", {}) or {}
+    witness_kind: str | None = None
+    witness_anchor: str | None = None
+    if witness is not None:
+        witness_kind = witness.get("subject", {}).get("kind")
+        witness_anchor = witness.get("producer")
+    return AdmissionInput(
+        claim_type=subject.get("claim_type"),
+        witness_kind=witness_kind,
+        witness_anchor=witness_anchor,
+        target=subject.get("target"),
+        now=now,
+    )
 
 
 def make_probe_receipt(target: str, observed_at: datetime) -> dict[str, Any]:

@@ -98,9 +98,20 @@ witness kind is `failed_health_probe`, anchored by signer X" — is
 decision-engine territory (Wicket / Governor), not WLP. WLP validates
 receipt mechanics and can verify an anchor against receiver-supplied
 trust configuration; the decision engine determines which witness kind
-and anchor are required for this receiver-side consequence. The split
-matters: if WLP picks the trust roots, "anchor-checkability" quietly
-becomes policy.
+and anchor are required for this receiver-side consequence.
+
+The split matters in **both** directions:
+
+- **WLP → policy leakage.** If WLP picks the trust roots,
+  "anchor-checkability" quietly becomes policy.
+- **Policy → WLP leakage.** If Wicket (or any admission engine) reads
+  raw WLP JSON as policy input, WLP wire vocabulary becomes policy
+  substrate — and future WLP schema changes become policy breakage.
+
+The correction (visible in `examples/receiver_gate/`): integration
+between WLP and Wicket must pass through a **normalized
+receiver-side admission input**, not raw WLP schema. The adapter is
+the boundary object; the policy never sees the wire.
 
 ## The genuinely new pieces: two receiver-owned boundaries
 
@@ -177,7 +188,12 @@ This note does not authorize:
   a non-normative toy fixture that uses a hardcoded local probe
   signer and clearly marks the witness-anchor model as fixture-local.
 - Calling Wicket from WLP, or absorbing Wicket's policy vocabulary
-  into WLP's claim-type taxonomy.
+  into WLP's claim-type taxonomy. This restriction is **directional**:
+  it forbids WLP-the-library reaching into Wicket, and it forbids
+  Wicket consuming raw WLP wire shape. It does **not** forbid a
+  receiver — sitting between the two — from normalizing packet facts
+  into an admission input and asking Wicket-shaped policy for a
+  verdict. The receiver-gate fixture demonstrates this seam.
 - Treating this note as a substitute for the open-issue entry in
   `docs/open-issues.md`; if/when promotion happens, the open-issue
   entry is the authoritative repayment record, not this candidate.
