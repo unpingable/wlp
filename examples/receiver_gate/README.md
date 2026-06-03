@@ -59,11 +59,13 @@ Key boundaries:
   placeholder (SPEC §6.4). HMAC is fixture-local, not the eventual
   WLP crypto.
 - A promotion of `ClaimReceipt` to load-bearing protocol status.
-- A live Wicket integration. The admission policy is a fixture-local
-  Wicket-shaped stand-in (`LocalAdmissionPolicy` in `admission.py`),
-  not a bridge to the real Wicket kernel. A real deployment would
-  back the same `AdmissionPolicy` protocol with a Wicket call (e.g.,
-  shell out to `wicket check` over a cooked Intent).
+- A normative WLP/Wicket integration product. The seam is
+  fixture-local. `LocalAdmissionPolicy` (in `admission.py`) is a
+  Wicket-shaped stand-in usable without the Wicket binary;
+  `WicketAdmissionPolicy` (in `wicket_policy.py`) is a real bridge
+  that shells out to the `wicket check` CLI when the binary is
+  available. Both implement the same `AdmissionPolicy` protocol;
+  the receiver gate does not know which is wired in.
 - A normative envelope schema. The dicts here have WLP-flavored
   field names but do not conform to or extend `SPEC.md`.
 
@@ -74,7 +76,8 @@ cd examples/receiver_gate
 python3 -m pytest .
 ```
 
-Tests (one per lie-class case, plus the receiver-mediated boundary):
+Tests (`test_receiver_gate.py`, one per lie-class case plus the
+receiver-mediated boundary):
 
 - `admitted_restart_mutates_state`
 - `naked_claim_refused_no_mutation`
@@ -88,6 +91,20 @@ Tests (one per lie-class case, plus the receiver-mediated boundary):
 - `policy_receives_normalized_admission_input_not_raw_packet`
 - `adapter_produces_admission_input_shape`
 - `admission_module_has_no_wlp_coupling`
+
+Wicket wiring tests (`test_wicket_policy.py`, skip-on-missing-binary
+for the live invocations):
+
+- `wicket_policy_accepts_only_admission_input`
+- `supported_restart_with_valid_witness_is_permitted`  *(needs wicket)*
+- `unsupported_claim_type_is_unsupported_without_wicket`
+- `wrong_witness_kind_is_refused_without_wicket`
+- `wrong_witness_anchor_is_refused_without_wicket`
+- `wicket_denial_reason_survives_into_admission_verdict`  *(needs wicket)*
+- `wlp_crate_has_no_wicket_dependency`
+- `receiver_gate_with_wicket_policy_end_to_end`  *(needs wicket)*
+- `cook_table_is_the_only_admission_to_wicket_mapping`
+- `missing_wicket_binary_raises_file_not_found`
 
 ## Wicket integration: the receiver-mediated seam
 
@@ -126,9 +143,49 @@ The forbidden shapes:
 - WLP absorbing Wicket policy vocabulary (claim-type taxonomy stays
   WLP-side; admissibility-policy vocabulary stays admission-side).
 
-The fixture's `LocalAdmissionPolicy` is a Wicket-shaped stand-in: it
-encodes the policy a real Wicket bridge would compute, but it is
-not the kernel. To swap in real Wicket, implement the
-`AdmissionPolicy` protocol by translating `AdmissionInput` into a
-cooked Wicket `Intent` and shelling out to `wicket check` (or an
-equivalent FFI). The receiver gate is unchanged by that swap.
+Two `AdmissionPolicy` implementations are provided:
+
+- **`LocalAdmissionPolicy`** (`admission.py`) — a Wicket-shaped
+  Python stand-in. Encodes the policy a real Wicket bridge would
+  compute, but is not the kernel. Default for the unit tests; no
+  external dependency.
+- **`WicketAdmissionPolicy`** (`wicket_policy.py`) — the real
+  bridge. Cooks `AdmissionInput` into a Wicket `Intent` JSON,
+  shells out to the `wicket check` CLI, translates the returned
+  `Outcome` back into an `AdmissionVerdict`. Locates the binary
+  via the `WICKET_BIN` env var, common build paths, or `PATH`. The
+  cook is the second adapter in the chain: WLP packet →
+  `AdmissionInput` (receiver adapter) → Wicket `Intent` (cook).
+  Wicket-binary-dependent tests are skipped gracefully when no
+  binary is found.
+
+The receiver gate accepts either via its `policy=` constructor
+argument; both satisfy the same protocol and the gate does not know
+which is wired in.
+
+### Refusal layers in `WicketAdmissionPolicy`
+
+```
+AdmissionInput
+  │
+  ▼ cook table lookup
+  │   miss → AdmissionVerdict("unsupported", "unsupported claim type")
+  │
+  ▼ witness kind/anchor precondition
+  │   mismatch → AdmissionVerdict("refused", "<reason>")
+  │
+  ▼ cook → Wicket Intent JSON
+  │
+  ▼ subprocess: `wicket check`
+  │
+  ▼ translate Outcome.surface_verdict
+      authorized      → AdmissionVerdict("accepted", "wicket authorized ...")
+      denied/gap/...  → AdmissionVerdict("refused",  "wicket <verdict> (REASON_CODES)")
+```
+
+Wicket's role is the standing × precedence × scope × revocation
+check given the cooked Intent. The cook table's role is the
+receiver-side semantic check ("does this combination of claim_type,
+witness_kind, witness_anchor map to a Wicket rule I am willing to
+cite?"). Neither role overlaps; neither is delegated across the
+boundary.
