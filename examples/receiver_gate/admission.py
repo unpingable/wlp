@@ -66,9 +66,13 @@ class LocalAdmissionPolicy:
     """Fixture-local Wicket-shaped admission policy.
 
     Mirrors what a Wicket-backed policy would decide for the receiver
-    gate's demonstrated lie-class: for `restart_service`, require a
-    `failed_health_probe` witness anchored by `probe-service`. A real
-    deployment would replace this with a Wicket bridge.
+    gate's demonstrated lie-classes. A real deployment would replace
+    this with a Wicket bridge (see `wicket_policy.py`).
+
+    `REQUIRED_WITNESS` must stay parallel to
+    `wicket_policy.DEFAULT_COOK_TABLE`: a receiver swapping one
+    implementation for the other should see the same admission
+    decisions on the keys both implementations recognize.
 
     The point of the seam is that this class's signature accepts only
     `AdmissionInput`, never a WLP packet dict.
@@ -76,6 +80,7 @@ class LocalAdmissionPolicy:
 
     REQUIRED_WITNESS = {
         "restart_service": ("failed_health_probe", "probe-service"),
+        "flush_cache": ("cache_pressure_signal", "metrics-service"),
     }
 
     def accepts(self, admission_input: AdmissionInput) -> AdmissionVerdict:

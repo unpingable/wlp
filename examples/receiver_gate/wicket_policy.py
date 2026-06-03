@@ -80,6 +80,22 @@ DEFAULT_COOK_TABLE: dict[str, _CookRecipe] = {
         ),
         expected_effect_template="restart {target}",
     ),
+    # Second entry — kept parallel with LocalAdmissionPolicy.REQUIRED_WITNESS.
+    # Specimen for "the cook generalizes": different claim_type, different
+    # witness vocabulary, different anchor, same cook shape. No new code path
+    # is needed in `accepts()` to support it — the table lookup is the only
+    # thing that varies.
+    "flush_cache": _CookRecipe(
+        required_witness_kind="cache_pressure_signal",
+        required_witness_anchor="metrics-service",
+        intended_action="flush_cache",
+        operation_class="execute",
+        rule_text=(
+            "flush_cache is authorized by a cache_pressure_signal witness "
+            "anchored at metrics-service"
+        ),
+        expected_effect_template="flush {target}",
+    ),
 }
 
 

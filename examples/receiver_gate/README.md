@@ -106,6 +106,25 @@ for the live invocations):
 - `cook_table_is_the_only_admission_to_wicket_mapping`
 - `missing_wicket_binary_raises_file_not_found`
 
+Cook-seam generality tests (`test_cook_seam_generality.py`, verifies
+the seam tolerates ≥2 cook-table entries without per-entry code
+paths or vocabulary leakage):
+
+- `cook_tables_share_the_same_claim_type_keys`
+- `cook_tables_agree_on_required_witness_combinations`
+- `local_admits_flush_cache_when_all_fields_match`
+- `local_refuses_flush_cache_with_wrong_witness_{kind,anchor}`
+- `local_still_admits_restart_service`
+- `wicket_refuses_flush_cache_with_wrong_witness_{kind,anchor}_without_invoking`
+- `wicket_admits_flush_cache_when_cooked_through_real_wicket`  *(needs wicket)*
+- `wicket_still_admits_restart_service_end_to_end`  *(needs wicket)*
+- `cooked_intent_for_flush_cache_has_no_wlp_wire_fields`
+- `cooked_intent_carries_recipe_specific_rule_text`
+- `receiver_gate_handle_is_policy_agnostic_at_source_level`
+- `receiver_gate_routes_arbitrary_claim_type_through_policy`
+- `receiver_gate_hmac_fixture_remains_single_anchor`  *(pins the
+  single-anchor finding below)*
+
 ## Wicket integration: the receiver-mediated seam
 
 This fixture demonstrates the **receiver-mediated** Wicket/WLP seam —
@@ -189,3 +208,41 @@ receiver-side semantic check ("does this combination of claim_type,
 witness_kind, witness_anchor map to a Wicket rule I am willing to
 cite?"). Neither role overlaps; neither is delegated across the
 boundary.
+
+### Cook table
+
+| claim_type        | required witness_kind   | required witness_anchor | Wicket evidence kind |
+|-------------------|-------------------------|-------------------------|----------------------|
+| `restart_service` | `failed_health_probe`   | `probe-service`         | `command_output`     |
+| `flush_cache`     | `cache_pressure_signal` | `metrics-service`       | `command_output`     |
+
+Both entries pass through the same `accepts()` code path; the only
+per-claim_type knowledge is the table lookup. Adding a third entry
+is a table edit, not a code change.
+
+## Finding: HMAC fixture is single-anchor
+
+Adding `flush_cache` to the cook table generalized the **seam**
+cleanly — both `LocalAdmissionPolicy` and `WicketAdmissionPolicy`
+admit it without any per-claim-type branch in `accepts()`, and the
+cooked Wicket Intent carries no WLP wire vocabulary.
+
+The receiver-gate's **HMAC verification** does not generalize at
+the same altitude. `verify_probe_receipt` is hardcoded to a single
+trust anchor (`TRUSTED_PROBE_ID = "probe-service"`,
+`TRUSTED_PROBE_KEY = b"..."`). A `flush_cache` claim with a
+witness signed by `metrics-service` would refuse at the
+trust-anchor verification step, because the gate has no
+metrics-service key.
+
+This is **anchor-config, not seam-shape**. Generalizing the gate
+to verify multiple anchors would mean replacing the two module-
+level constants with a trust-anchor table (`anchor_id → key`) on
+the gate at construction. That is a separate slice with its own
+scope (key rotation, anchor authentication, fixture-vs-production
+boundary) — distinct from the cook seam, which is unchanged.
+
+The single-anchor limitation is pinned by
+`test_receiver_gate_hmac_fixture_remains_single_anchor`: if the
+gate later grows a trust-anchor table, that test should be updated
+and end-to-end flush_cache coverage added through the gate.
