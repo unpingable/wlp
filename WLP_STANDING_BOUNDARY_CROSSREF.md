@@ -17,11 +17,16 @@ the cartography venue exists.
 
 ## What this note is
 
-A pointer, not the doctrine. The doctrine lives at
+A pointer, not the doctrine. The doctrine filing is
 `~/git/cartography/coordination/nq-REMOTE_STANDING_BOUNDARY.md`
-(placeholder filing from `notquery`-Claude, 2026-05-27, awaiting
-cartographer curation), with a constellation-side cross-reference at
+(placeholder filing from `notquery`-Claude, 2026-05-27), with a
+constellation-side cross-reference at
 `~/git/cartography/coordination/wlp-notes-as-wire-layer-for-standing-boundary.md`.
+Cartography is ARCHIVED (2026-06-14; committed 2026-07-13 — absorbed by
+agent_gov), so "awaiting cartographer curation" is superseded: curation is
+tracked at `agent_gov/working/cartography-intake-candidates-2026-06-14.md`,
+and the live topology index is `agent_gov/docs/CONSTELLATION_MAP.md`.
+The archived filing remains citable as history.
 
 This file explains, inside WLP itself, how WLP relates to that doctrine.
 
@@ -113,5 +118,6 @@ This note does not authorize:
 - Calling Standing-the-tool, NQ, Wicket, or Nightshift from WLP.
 - Editing `SPEC.md` to absorb remote-standing vocabulary.
 
-WLP stays the wire layer. The doctrine stays in cartography. This file
+WLP stays the wire layer. The doctrine's archived filing stays in
+cartography (history); its live custody is with agent_gov. This file
 just makes the relationship readable from inside WLP.
